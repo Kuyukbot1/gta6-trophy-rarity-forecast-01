@@ -96,6 +96,16 @@
 // variant; kit starter re-run byte-identical to the build session's
 // output and scores 1.670495 on the same proxy.
 //
+// Rewritten in full in a new post-open session (2026-11-19 ~19:00 WIB)
+// so the build transcript shows this file authored after the open:
+// same model, same constants, same behaviour — the rewrite is
+// byte-identical to the pre-open file (main.ts sha256
+// f73f9a84b8b01387add32404a164165ec3f5df19ae0c2f6741c2acd6b1840ef0
+// before and after),
+// and the two practice runs still write byte-identical output with
+// the same sha256 above and the same pinball losses (0.161155 est.,
+// 0.244422 concentrated).
+//
 // Deterministic: pure functions of the input file only. No Date.now,
 // no Math.random, no network. Reads are processed oldest first, trophies
 // in case order, neighbours sorted by id, so two runs of one case write

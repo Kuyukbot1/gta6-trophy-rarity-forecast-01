@@ -28,7 +28,7 @@
 // 2. Past the first refresh (three or more distinct reads). Each trophy's
 //    logit rate grows roughly linearly in log(1 + hours since the release
 //    day began): players accumulate and earn trophies at a steady pace on
-//    that clock, so a least-squares line per trophy over the last 24 hours
+//    that clock, so a least-squares line per trophy over the last 18 hours
 //    of distinct reads, read at the target, is the centre. The spread
 //    combines the fit's residual (how wobbly the trophy's own line is, with
 //    a floor so a suspiciously straight line does not claim false
@@ -63,8 +63,11 @@ const ZNORM = [-1.6448536269514722, -0.6744897501960817, 0, 0.6744897501960817, 
 const PLATEAU_DILUTION = 0.22;
 /** Logit spread while still on the first plateau (see header). */
 const PLATEAU_SPREAD = 0.65;
-/** How far back the trend fit looks, in hours before the last read. */
-const FIT_WINDOW_HOURS = 24;
+/** How far back the trend fit looks, in hours before the last read: 18, so
+    the line tracks the current trend regime — a 24h window drags in a stale
+    pre-acceleration read and underestimates the weekend-acceleration cases
+    (synthetic mean 0.167 vs 0.172 at 24h; practice proxies unchanged). */
+const FIT_WINDOW_HOURS = 18;
 /** Extra logit spread per unit of log-time between the last read and target. */
 const SPREAD_PER_LOG_HOUR = 0.3;
 /** Smallest residual a fit may claim, in logit units. */

@@ -2,84 +2,30 @@
 [![rank](https://make.fun/badge/gta6-trophy-rarity-forecast-01/Kuyukbot1/gta6-trophy-rarity-forecast-01/rank.svg)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01)
 [![reward](https://make.fun/badge/gta6-trophy-rarity-forecast-01/Kuyukbot1/gta6-trophy-rarity-forecast-01/reward.svg)](https://make.fun/bounty/gta6-trophy-rarity-forecast-01)
 
-An entry for the [make.fun bounty](https://make.fun/bounty/gta6-trophy-rarity-forecast-01).
+# GTA VI trophy rarity forecast
 
-# GTA VI trophy rarity forecast — gta6-trophy-rarity-forecast-01
+A forecaster for [gta6-trophy-rarity-forecast-01](https://make.fun/bounty/gta6-trophy-rarity-forecast-01): for each of Grand Theft Auto VI's 55 PlayStation 5 trophies, it predicts the percent of Exophase-tracked players who will have earned it by 2026-11-26T00:00:00Z, as five quantiles per trophy, from the house's reads of the trophy page up to the deadline.
 
-A program that forecasts, for every Grand Theft Auto VI PlayStation 5
-trophy, its earn rate on Exophase at 2026-11-26T00:00:00Z — the percent of
-the players Exophase tracks who will have earned it a week after launch —
-from everything the house recorded of the trophy page up to the deadline,
-as five quantiles a trophy.
+## How it works
 
-## What it does
+Exophase refreshes a game's counts in jumps, hours apart, so the recorded history is a staircase: long flat runs, then a step. The program handles the two regimes separately:
 
-- `main.ts` (Node 22, standard library only, deterministic) reads one case
-  JSON per run and writes `<id>.out` with one row per trophy (55 at the
-  opening), each five quantiles `[q05, q25, q50, q75, q95]`. It runs
-  offline, no network, in about 0.1 s per case.
-- The model is fitted at run time from the case file's own history —
-  nothing is fitted to the final case, which nobody can see:
-  1. **Distinct reads.** Exophase refreshes a game's counts on its own
-     schedule, hours apart, so the page is a step function: long flat
-     plateaus, then jumps at refreshes. The model fits on one read per
-     plateau, never on the raw 10-minute reads, which would overweight
-     however long a plateau happened to last.
-  2. **Per-trophy trend.** For each trophy, the least-squares slope of
-     logit(rate) on ln(1 + hours since the release day began) over its
-     distinct reads in the last 24 hours, applied forward from its rate
-     in the last read. An early story trophy climbs fast; the platinum
-     falls as the tracked population outgrows its handful of holders; a
-     trophy whose rate never moved gets slope 0 — a trophy at 100%
-     stays at 100%.
-  3. **Caps.** Forecast odds may grow at most 30x from the last read,
-     and no rate is forecast above 90% — but a cap never drags a trophy
-     below its last read's level.
-  4. **Spread.** sigma = sqrt(s² + (0.4·dx)²), s the trophy's residual
-     spread, dx the log-time distance to the target: the further the
-     extrapolation, the wider the band.
-  5. **Flat history.** If no refresh has been seen yet, the forecast
-     expects the one the target straddles: every rate falls to 22% of
-     its last read, with a wide spread. That 22% is pinned by the
-     totals the competition itself publishes for the first refresh
-     (638 → 3,868 players tracked, 943 → 4,276 trophies earned, the
-     one trophy at 100% staying there): new players had earned almost
-     nothing beyond the trophy everyone holds.
+- **Still on the launch-night plateau** (fewer than three distinct reads, as in both practice cases): no trend exists to fit, so the median is the last rate times 0.22 — the average dilution the published totals imply for the first refresh — with a wide 0.65 logit spread, since one refresh can land anywhere from pure dilution to the totals-implied level. The trophy at 100% stays at 100%.
+- **Past the first refresh**: each trophy's logit rate grows roughly linearly in log(1 + hours since release day), so a least-squares line per trophy over the last 24 hours of distinct reads, read at the target, is the centre. The spread combines the fit's residual with a term that grows with the forecast distance. Trophies with no line of their own borrow the median slope of trophies near them in rate.
 
-## Why this shape
+## Running it
 
-A trophy's earn rate is holders over tracked players, and both move:
-players keep syncing (which dilutes every rate) while holders grow as
-players progress (which raises them). The per-trophy log-time trend
-reads the net of those two forces off the case's own recording instead
-of assuming either one wins, and the refresh prior handles the one
-shape the trend cannot see — a history that has not refreshed yet.
+Node 22, standard library only, deterministic (no clock, no randomness, no network):
 
-## Validation
-
-The kit ships no reference answers, so the practice answers used here
-are reconstructed from the totals the competition itself publishes
-(see `BUILD_LOG.md` in the bounty folder), and the final is tested on
-locally simulated 7-day recordings (three truth shapes: log-linear,
-weekend bump, saturating). Mean pinball loss on the logit scale, mine
-vs the house baselines:
-
-| case | mine | curve baseline | persistence |
-| --- | --- | --- | --- |
-| practice p00/p01 (proxy) | 0.161 | 1.405 | 1.405 |
-| synthetic log-linear | 0.091 | 0.216 | 0.641 |
-| synthetic weekend bump | 0.108 | 0.240 | 0.754 |
-| synthetic saturating | 0.325 | 0.343 | 0.412 |
-| **synthetic mean** | **0.175** | **0.266** | **0.602** |
-
-Two runs of one case write byte-identical output. Full numbers,
-rejected alternatives and the determinism check are in `BUILD_LOG.md`
-in the bounty folder (not part of the entry).
-
-## Run it
-
-```bash
+```sh
 mkdir -p out && MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-Two runs of one case write byte-identical output.
+It reads every `<id>.in` in the input directory and writes `<id>.out` — `{"trophies":[{"id":n,"q":[q05,q25,q50,q75,q95]}, ...]}` — for each case.
+
+## Local verification
+
+- Two runs on the kit practice inputs are byte-identical; each output has exactly 55 rows of five finite, non-decreasing quantiles in 0–100.
+- Local pinball loss on the reconstructed practice answers: ~0.13 (best-estimate proxy) and ~0.22 (concentrated-refresh stress variant), against ~1.41–1.67 for the house baselines.
+- On six synthetic 7-day final-like cases: mean pinball ~0.17, beating the house curve (~0.27) and persistence (~0.60) on all six.
+- Runtime ~0.1 s per case, far under the 8 s cap.
